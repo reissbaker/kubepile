@@ -38,10 +38,10 @@ your `.zshrc`/`.bashrc`/`.profile`/etc. Kubepile supports Zsh, Bash, and Fish.
 
 ## Kubepile configs
 
-Each `*.yaml` file is a normal kubeconfig. You can paste in kubeconfigs from
-providers without converting them to a kubepile-specific schema. During
-`compile`, kubepile reads every file and merges its `clusters`, `users`, and
-`contexts` directly into the generated kubeconfig.
+Each `~/.config/kubepile/*.yaml` file is a normal kubeconfig. You can paste in
+kubeconfigs from providers without converting them to a kubepile-specific
+schema. During `compile`, kubepile reads every file and merges its `clusters`,
+`users`, and `contexts` directly into the generated kubeconfig.
 
 Kubepile automatically ensures the following:
 
