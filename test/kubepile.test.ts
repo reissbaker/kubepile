@@ -6,7 +6,9 @@ import { runCli } from "../src/cli.ts";
 import {
   buildMergedConfig,
   compileToKubeConfig,
+  defaultKubepileDir,
   parseKubeConfig,
+  serializeGeneratedKubeConfig,
   splitKubeConfigFile,
 } from "../src/kubepile.ts";
 
@@ -367,6 +369,23 @@ contexts:
     const output = parseKubeConfig(outputSource, outputPath);
     expect(output["current-context"]).toBeUndefined();
     expect(output.contexts?.[0]?.name).toBe("dev-source");
+  });
+
+  it("omits --config-dir from the generated rebuild command for the default config dir", () => {
+    const output = serializeGeneratedKubeConfig(
+      {
+        apiVersion: "v1",
+        kind: "Config",
+        preferences: {},
+        clusters: [],
+        users: [],
+        contexts: [],
+      },
+      defaultKubepileDir(),
+    );
+
+    expect(output).toContain("#    kubepile compile\n");
+    expect(output).not.toContain("--config-dir");
   });
 });
 
