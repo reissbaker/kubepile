@@ -1,6 +1,6 @@
 {
   "name": "kubepile",
-  "version": "0.1.0",
+  "version": "0.0.1",
   "description": "Compile and split kubeconfig files from ~/.config/kubepile.",
   "type": "module",
   "main": "./dist/src/kubepile.js",
@@ -17,7 +17,8 @@
   "files": [
     "dist/package.json",
     "dist/src",
-    "README.md"
+    "README.md",
+    "package.json"
   ],
   "scripts": {
     "clean": "rm -rf dist",
