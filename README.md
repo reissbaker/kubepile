@@ -15,9 +15,9 @@ kubeconfig.
 
 Kubepile exposes a tiny set of commands to manage your configs:
 
-* `compile`: compile your Kubepile configs into a merged kubeconfig
-* `source`: set a specific context as your default for the current shell
-* `split`: decompile an existing, messy kubeconfig into nice Kubepile configs
+* [`compile`](#compile): compile your Kubepile configs into a merged kubeconfig
+* [`source`](#source): set a specific context as your default for the current shell
+* [`split`](#split): decompile an existing, messy kubeconfig into nice Kubepile configs
 
 ## Install
 
