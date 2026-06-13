@@ -9,6 +9,10 @@ import {
   defaultKubepileDir,
   splitKubeConfigFile,
 } from "./kubepile.ts";
+import {
+  generateShellCommand,
+  installShellIntegration,
+} from "./shell.ts";
 
 const program = createProgram();
 
@@ -91,6 +95,42 @@ Defaults:
       });
 
       process.stdout.write(`Wrote ${result.writtenFiles.length} kubeconfig file(s) into ${result.outputDir}\n`);
+    });
+
+  program
+    .command("install")
+    .description("Install the kubepile shell function for the current shell.")
+    .action(async () => {
+      const result = await installShellIntegration();
+      const action = result.updated ? "Installed" : "Updated";
+      process.stdout.write(`${action} kubepile shell integration in ${result.rcFile}\n`);
+      process.stdout.write("Start a new shell, then run: kubepile source <context>\n");
+    });
+
+  program
+    .command("generate-shell-command")
+    .description("Generate shell code for kubepile source. Usually called by the installed shell function.")
+    .argument("<context>", "context name to source")
+    .option("--source <file>", "source kubeconfig path")
+    .option("--shell <shell>", "shell command format: bash, zsh, or fish", "bash")
+    .action(async (context, options) => {
+      const shell = options.shell === "fish" ? "fish" : "posix";
+      const result = await generateShellCommand(context, {
+        sourcePath: options.source,
+        shell,
+      });
+
+      process.stdout.write(`${result.shellCommand}\n`);
+    });
+
+  program
+    .command("source")
+    .description("Switch to one kube context in the current shell.")
+    .argument("<context>", "context name to source")
+    .action(() => {
+      throw new Error(
+        "kubepile source requires shell integration. Run `kubepile install`, start a new shell, then run `kubepile source <context>`.",
+      );
     });
 
   return program;

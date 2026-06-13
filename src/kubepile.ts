@@ -295,6 +295,23 @@ export function splitKubeConfig(config: KubeConfig, sourceLabel = "kubeconfig"):
   });
 }
 
+export function extractContextConfig(
+  config: KubeConfig,
+  contextName: string,
+  sourceLabel = "kubeconfig",
+): KubeConfig {
+  const splitConfig = splitKubeConfig(config, sourceLabel).find((candidate) => candidate.contextName === contextName);
+
+  if (!splitConfig) {
+    throw new Error(`${sourceLabel} does not contain context "${contextName}"`);
+  }
+
+  return {
+    ...splitConfig.config,
+    "current-context": contextName,
+  };
+}
+
 export async function readKubeConfigFile(filePath: string): Promise<KubeConfig> {
   const source = await readFile(filePath, "utf8");
   return parseKubeConfig(source, filePath);

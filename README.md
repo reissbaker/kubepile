@@ -63,6 +63,31 @@ kubepile compile --no-backup
 
 Running `kubepile` with no command prints help.
 
+## Source
+
+`kubepile source <context>` switches your current shell to one context by
+creating a temporary kubeconfig containing only that context and exporting
+`KUBECONFIG` to point at it. It also prefixes your shell prompt with the context
+name.
+
+Shells do not let child processes modify the parent shell environment, so this
+requires installing a small shell function first:
+
+```sh
+kubepile install
+```
+
+Then start a new shell and run:
+
+```sh
+kubepile source prod
+```
+
+`kubepile install` installs only for your current shell. It supports bash, zsh,
+and fish. The installed function proxies every normal command to the real
+`kubepile` binary with `command kubepile`, so it follows whatever `kubepile` is
+currently on your `PATH` after tools like `nvm` update it.
+
 ## Split
 
 Do you already have a giant unmaintainable mess of a kubeconfig? No worries!
