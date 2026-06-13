@@ -11,7 +11,7 @@ boxes](https://raw.githubusercontent.com/reissbaker/kubepile/refs/heads/main/box
 
 Kubepile lets you maintain individual, per-provider kubeconfigs in a
 `~/.config/kubepile` directory, and compile them into a single, merged
-kubeconfig.
+kubeconfig so that ordinary Kubernetes tooling can use them.
 
 Kubepile exposes a tiny set of commands to manage your configs:
 
