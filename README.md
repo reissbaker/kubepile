@@ -15,11 +15,11 @@ kubeconfig so that ordinary Kubernetes tooling can use them.
 
 Kubepile exposes a tiny set of commands to manage your configs:
 
+* [`split`](#split): decompile an existing, messy kubeconfig into nice, clean
+  Kubepile configs
 * [`compile`](#compile): compile your Kubepile configs into a merged kubeconfig
 * [`source`](#source): set a specific context as your default for the current
   shell
-* [`split`](#split): decompile an existing, messy kubeconfig into nice, clean
-  Kubepile configs
 
 ## Install
 
@@ -56,6 +56,36 @@ Kubepile will never set a `current-context`, out of the design belief that
 setting a global, mutable, cross-shell-session `current-context` is a dangerous
 footgun in multi-cluster setups. Instead, use `kubepile source <context>` to
 temporarily set a default context for your current shell session.
+
+## Split
+
+Do you already have a giant unmaintainable mess of a kubeconfig? No worries!
+Kubepile ships a `split` command that auto-splits your existing kubeconfig into
+separate per-context Kubepile config files, and tells you on the command line
+if you have unsplittable configs due to impossible settings from config drift —
+and which keys exactly are the problem, so you can clean up your config before
+splitting it.
+
+To split your config, run:
+
+```sh
+kubepile split
+```
+
+This reads `~/.kube/config` and writes one kubeconfig per context into
+`~/.config/kubepile`.
+
+If there are errors in your kubeconfig that prevent splitting, it'll tell you
+what they are.
+
+You can optionally override the source kubeconfig and the output Kubepile
+directory. These are the defaults:
+
+```sh
+kubepile split --source ~/.kube/config --output-dir ~/.config/kubepile
+```
+
+Context names that are not safe as filenames are percent-encoded when split.
 
 ## Compile
 
@@ -121,33 +151,3 @@ kubepile install
 
 And re-source your main shell config (such as e.g. a `.zshrc`) or start a new
 shell.
-
-## Split
-
-Do you already have a giant unmaintainable mess of a kubeconfig? No worries!
-Kubepile ships a `split` command that auto-splits your existing kubeconfig into
-separate per-context Kubepile config files, and tells you on the command line
-if you have unsplittable configs due to impossible settings from config drift —
-and which keys exactly are the problem, so you can clean up your config before
-splitting it.
-
-To split your config, run:
-
-```sh
-kubepile split
-```
-
-This reads `~/.kube/config` and writes one kubeconfig per context into
-`~/.config/kubepile`.
-
-If there are errors in your kubeconfig that prevent splitting, it'll tell you
-what they are.
-
-You can optionally override the source kubeconfig and the output Kubepile
-directory. These are the defaults:
-
-```sh
-kubepile split --source ~/.kube/config --output-dir ~/.config/kubepile
-```
-
-Context names that are not safe as filenames are percent-encoded when split.
