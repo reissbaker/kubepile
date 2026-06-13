@@ -274,8 +274,19 @@ async function listKubeConfigFiles(inputDir: string): Promise<string[]> {
   }
 
   const entries = await readdir(inputDir, { withFileTypes: true });
+  const unsupportedYamlFiles = entries
+    .filter((entry) => entry.isFile() && /\.ya?ml$/i.test(entry.name) && !entry.name.endsWith(".yaml"))
+    .map((entry) => entry.name)
+    .sort((a, b) => a.localeCompare(b));
+
+  if (unsupportedYamlFiles.length > 0) {
+    throw new Error(
+      `Unsupported kubeconfig file extension in ${inputDir}: ${unsupportedYamlFiles.join(", ")}. Use .yaml only.`,
+    );
+  }
+
   const files = entries
-    .filter((entry) => entry.isFile() && /\.(ya?ml)$/i.test(entry.name))
+    .filter((entry) => entry.isFile() && entry.name.endsWith(".yaml"))
     .map((entry) => path.join(inputDir, entry.name))
     .sort((a, b) => a.localeCompare(b));
 

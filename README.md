@@ -12,10 +12,10 @@ Kubepile lets you maintain individual, per-cluster kubeconfigs in a
 `~/.config/kubepile` directory, and compile them into a single, merged
 kubeconfig, where each context is named after the filename.
 
-Each `*.yaml` or `*.yml` file contributes one context. The output context name
-is the source filename without its extension, so `~/.config/kubepile/eks.yaml`
-becomes a context named `eks`. The compiled kubeconfig intentionally does not
-set `current-context`.
+Each `*.yaml` file contributes one context. The output context name is the
+source filename without its extension, so `~/.config/kubepile/eks.yaml` becomes
+a context named `eks`. The compiled kubeconfig intentionally does not set
+`current-context`.
 
 ## Install
 
@@ -29,9 +29,9 @@ npm install -g kubepile
 kubepile compile
 ```
 
-This reads `~/.config/kubepile/*.yaml` and `~/.config/kubepile/*.yml`, then
-writes `~/.kube/config`. If `~/.kube/config` already exists, `kubepile compile`
-prompts before copying it to `~/.kube/config.bak`.
+This reads `~/.config/kubepile/*.yaml`, then writes `~/.kube/config`. If
+`~/.kube/config` already exists, `kubepile compile` prompts before copying it to
+`~/.kube/config.bak`.
 
 Explicit command and options:
 

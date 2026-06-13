@@ -43,7 +43,7 @@ current-context: source-eks
       "utf8",
     );
     await writeFile(
-      path.join(dir, "gke.yml"),
+      path.join(dir, "gke.yaml"),
       `apiVersion: v1
 kind: Config
 clusters:
@@ -98,6 +98,27 @@ contexts:
     );
 
     await expect(buildMergedConfig({ inputDir: dir })).rejects.toThrow(/multiple contexts|2 contexts/);
+  });
+
+  it("rejects .yml files", async () => {
+    const dir = await tempDir();
+    await writeFile(
+      path.join(dir, "dev.yml"),
+      `apiVersion: v1
+kind: Config
+clusters:
+  - name: cluster
+    cluster:
+      server: https://dev.example.test
+contexts:
+  - name: dev-source
+    context:
+      cluster: cluster
+`,
+      "utf8",
+    );
+
+    await expect(buildMergedConfig({ inputDir: dir })).rejects.toThrow(/Use \.yaml only/);
   });
 
   it("treats a leading tilde in an explicit input path as literal", async () => {
