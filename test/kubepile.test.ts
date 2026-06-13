@@ -18,7 +18,7 @@ afterEach(async () => {
 });
 
 describe("buildMergedConfig", () => {
-  it("merges source files into filename-named contexts without a current context", async () => {
+  it("merges source files without renaming clusters, users, or contexts", async () => {
     const dir = await tempDir();
     await writeFile(
       path.join(dir, "eks.yaml"),
@@ -38,7 +38,6 @@ contexts:
       cluster: source-eks-cluster
       user: source-eks-user
       namespace: apps
-current-context: source-eks
 `,
       "utf8",
     );
@@ -66,20 +65,23 @@ contexts:
     const { config } = await buildMergedConfig({ inputDir: dir });
 
     expect(config["current-context"]).toBeUndefined();
-    expect(config.contexts?.map((context) => context.name)).toEqual(["eks", "gke"]);
-    expect(config.clusters?.map((cluster) => cluster.name)).toEqual(["eks", "gke"]);
-    expect(config.users?.map((user) => user.name)).toEqual(["eks", "gke"]);
+    expect(config.contexts?.map((context) => context.name)).toEqual(["source-eks", "source-gke"]);
+    expect(config.clusters?.map((cluster) => cluster.name)).toEqual([
+      "source-eks-cluster",
+      "source-gke-cluster",
+    ]);
+    expect(config.users?.map((user) => user.name)).toEqual(["source-eks-user", "source-gke-user"]);
     expect(config.contexts?.[0]?.context).toEqual({
-      cluster: "eks",
-      user: "eks",
+      cluster: "source-eks-cluster",
+      user: "source-eks-user",
       namespace: "apps",
     });
   });
 
-  it("rejects a source file with multiple contexts and no current-context", async () => {
+  it("rejects a source file with current-context", async () => {
     const dir = await tempDir();
     await writeFile(
-      path.join(dir, "ambiguous.yaml"),
+      path.join(dir, "default.yaml"),
       `apiVersion: v1
 kind: Config
 clusters:
@@ -90,14 +92,12 @@ contexts:
   - name: one
     context:
       cluster: cluster
-  - name: two
-    context:
-      cluster: cluster
+current-context: one
 `,
       "utf8",
     );
 
-    await expect(buildMergedConfig({ inputDir: dir })).rejects.toThrow(/multiple contexts|2 contexts/);
+    await expect(buildMergedConfig({ inputDir: dir })).rejects.toThrow(/must not set current-context/);
   });
 
   it("rejects .yml files", async () => {
@@ -119,6 +119,169 @@ contexts:
     );
 
     await expect(buildMergedConfig({ inputDir: dir })).rejects.toThrow(/Use \.yaml only/);
+  });
+
+  it.each([
+    {
+      name: "duplicate cluster names",
+      source: `apiVersion: v1
+kind: Config
+clusters:
+  - name: cluster
+    cluster:
+      server: https://one.example.test
+  - name: cluster
+    cluster:
+      server: https://two.example.test
+contexts:
+  - name: dev-source
+    context:
+      cluster: cluster
+`,
+      error: /Duplicate cluster name "cluster"/,
+    },
+    {
+      name: "duplicate user names",
+      source: `apiVersion: v1
+kind: Config
+clusters:
+  - name: cluster
+    cluster:
+      server: https://dev.example.test
+users:
+  - name: user
+    user:
+      token: one
+  - name: user
+    user:
+      token: two
+contexts:
+  - name: dev-source
+    context:
+      cluster: cluster
+      user: user
+`,
+      error: /Duplicate user name "user"/,
+    },
+    {
+      name: "duplicate context names",
+      source: `apiVersion: v1
+kind: Config
+clusters:
+  - name: cluster
+    cluster:
+      server: https://dev.example.test
+contexts:
+  - name: dev-source
+    context:
+      cluster: cluster
+  - name: dev-source
+    context:
+      cluster: cluster
+`,
+      error: /Duplicate context name "dev-source"/,
+    },
+  ])("rejects $name", async ({ source, error }) => {
+    const dir = await tempDir();
+    await writeFile(path.join(dir, "dev.yaml"), source, "utf8");
+
+    await expect(buildMergedConfig({ inputDir: dir })).rejects.toThrow(error);
+  });
+
+  it.each([
+    {
+      name: "cluster",
+      first: `apiVersion: v1
+kind: Config
+clusters:
+  - name: shared
+    cluster:
+      server: https://one.example.test
+contexts:
+  - name: one
+    context:
+      cluster: shared
+`,
+      second: `apiVersion: v1
+kind: Config
+clusters:
+  - name: shared
+    cluster:
+      server: https://two.example.test
+contexts:
+  - name: two
+    context:
+      cluster: shared
+`,
+    },
+    {
+      name: "user",
+      first: `apiVersion: v1
+kind: Config
+clusters:
+  - name: one-cluster
+    cluster:
+      server: https://one.example.test
+users:
+  - name: shared
+    user:
+      token: one
+contexts:
+  - name: one
+    context:
+      cluster: one-cluster
+      user: shared
+`,
+      second: `apiVersion: v1
+kind: Config
+clusters:
+  - name: two-cluster
+    cluster:
+      server: https://two.example.test
+users:
+  - name: shared
+    user:
+      token: two
+contexts:
+  - name: two
+    context:
+      cluster: two-cluster
+      user: shared
+`,
+    },
+    {
+      name: "context",
+      first: `apiVersion: v1
+kind: Config
+clusters:
+  - name: one-cluster
+    cluster:
+      server: https://one.example.test
+contexts:
+  - name: shared
+    context:
+      cluster: one-cluster
+`,
+      second: `apiVersion: v1
+kind: Config
+clusters:
+  - name: two-cluster
+    cluster:
+      server: https://two.example.test
+contexts:
+  - name: shared
+    context:
+      cluster: two-cluster
+`,
+    },
+  ])("rejects duplicate $name names across files", async ({ name, first, second }) => {
+    const dir = await tempDir();
+    await writeFile(path.join(dir, "one.yaml"), first, "utf8");
+    await writeFile(path.join(dir, "two.yaml"), second, "utf8");
+
+    await expect(buildMergedConfig({ inputDir: dir })).rejects.toThrow(
+      new RegExp(`Duplicate ${name} name "shared"`),
+    );
   });
 
   it("treats a leading tilde in an explicit input path as literal", async () => {
@@ -146,7 +309,7 @@ contexts:
       process.chdir(dir);
       const { config } = await buildMergedConfig({ inputDir: "~/configs" });
 
-      expect(config.contexts?.[0]?.name).toBe("literal");
+      expect(config.contexts?.[0]?.name).toBe("literal-source");
       expect(config.clusters?.[0]?.cluster.server).toBe("https://literal.example.test");
     } finally {
       process.chdir(originalCwd);
@@ -194,8 +357,7 @@ contexts:
           "# To add a kubepile config:",
           `# 1\\. Save a kubeconfig file in ${escapeRegExp(dir)}\\.`,
           `#    Example: ${escapeRegExp(path.join(dir, "dev.yaml"))}`,
-          "# 2\\. The filename becomes the context name\\.",
-          "# 3\\. Rebuild this generated config with:",
+          "# 2\\. Rebuild this generated config with:",
           `#    kubepile compile --config-dir ${escapeRegExp(dir)}`,
           "",
           "apiVersion: v1",
@@ -204,7 +366,7 @@ contexts:
     );
     const output = parseKubeConfig(outputSource, outputPath);
     expect(output["current-context"]).toBeUndefined();
-    expect(output.contexts?.[0]?.name).toBe("dev");
+    expect(output.contexts?.[0]?.name).toBe("dev-source");
   });
 });
 
@@ -280,6 +442,37 @@ current-context: prod
         },
       },
     ]);
+  });
+
+  it("rejects duplicate context names instead of overwriting split files", async () => {
+    const dir = await tempDir();
+    const sourcePath = path.join(dir, "config");
+    const outputDir = path.join(dir, "kubepile");
+    await writeFile(
+      sourcePath,
+      `apiVersion: v1
+kind: Config
+clusters:
+  - name: one-cluster
+    cluster:
+      server: https://one.example.test
+  - name: two-cluster
+    cluster:
+      server: https://two.example.test
+contexts:
+  - name: shared
+    context:
+      cluster: one-cluster
+  - name: shared
+    context:
+      cluster: two-cluster
+`,
+      "utf8",
+    );
+
+    await expect(splitKubeConfigFile({ sourcePath, outputDir })).rejects.toThrow(
+      /Duplicate context name "shared"/,
+    );
   });
 });
 

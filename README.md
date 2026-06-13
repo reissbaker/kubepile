@@ -1,21 +1,35 @@
 # Kubepile
 
-Have you ever tried to maintain a Kubernetes config for multiple clusters? It's
-gross! It's hard to visually track which users, clusters, and contexts relate
-to each other, and as you add and remove clusters your config inevitably bloats
-into a mess and becomes hard to reason about.
+Have you ever tried to maintain a Kubernetes config for multiple clusters, and
+multiple Kubernetes providers? It's gross! It's hard to visually track which
+users, clusters, and contexts relate to each other, and as you add and remove
+clusters your config inevitably bloats into a mess and becomes hard to reason
+about.
 
 ![messy
 boxes](https://raw.githubusercontent.com/reissbaker/kubepile/refs/heads/main/boxes.png)
 
-Kubepile lets you maintain individual, per-cluster kubeconfigs in a
+Kubepile lets you maintain individual, per-provider kubeconfigs in a
 `~/.config/kubepile` directory, and compile them into a single, merged
-kubeconfig, where each context is named after the filename.
+kubeconfig.
 
-Each `*.yaml` file contributes one context. The output context name is the
-source filename without its extension, so `~/.config/kubepile/eks.yaml` becomes
-a context named `eks`. The compiled kubeconfig intentionally does not set
-`current-context`.
+Each `*.yaml` file is a normal kubeconfig. You can paste in kubeconfigs from
+providers without converting them to a kubepile-specific schema. During
+`compile`, kubepile reads every file and merges its `clusters`, `users`, and
+`contexts` directly into the generated kubeconfig. It does not rename anything
+based on the filename.
+
+Kubepile automatically ensures the following:
+
+- No kubepile files set a `current-context`.
+- No cluster, user, or context names clash.
+
+If a new file is added that clashes or sets a `current-context`, kubepile will
+intentionally fail compilation with a helpful message explaining which file
+broke the kubepile rules.
+
+Kubepile will never set a `current-context`, out of the design belief that
+`current-context` is a dangerous footgun in multi-cluster setups.
 
 ## Install
 
@@ -47,10 +61,10 @@ Running `kubepile` with no command prints help.
 
 Do you already have a giant unmaintainable mess of a kubeconfig? No worries!
 Kubepile ships a `split` command that auto-splits your existing kubeconfig into
-separate kubepile config files, and tells you on the command line if you have
-unsplittable configs due to impossible settings from config drift — and which
-keys exactly are the problem, so you can clean up your config before splitting
-it.
+separate per-context kubepile config files, and tells you on the command line
+if you have unsplittable configs due to impossible settings from config drift —
+and which keys exactly are the problem, so you can clean up your config before
+splitting it.
 
 To split your config, run:
 

@@ -68,6 +68,12 @@ export interface SplitResult {
   writtenFiles: string[];
 }
 
+interface MergeNameSets {
+  clusters: Set<string>;
+  users: Set<string>;
+  contexts: Set<string>;
+}
+
 export function defaultKubepileDir(): string {
   return path.join(os.homedir(), ".config", "kubepile");
 }
@@ -85,12 +91,15 @@ export async function buildMergedConfig(options: CompileOptions = {}): Promise<{
   const configs = await Promise.all(
     inputFiles.map(async (filePath) => ({
       filePath,
-      contextName: contextNameFromFile(filePath),
       config: await readKubeConfigFile(filePath),
     })),
   );
 
-  const seenContextNames = new Set<string>();
+  const seenNames: MergeNameSets = {
+    clusters: new Set(),
+    users: new Set(),
+    contexts: new Set(),
+  };
   const merged: KubeConfig = {
     apiVersion: "v1",
     kind: "Config",
@@ -101,13 +110,10 @@ export async function buildMergedConfig(options: CompileOptions = {}): Promise<{
   };
 
   for (const source of configs) {
-    if (seenContextNames.has(source.contextName)) {
-      throw new Error(`Duplicate context name "${source.contextName}" from ${source.filePath}`);
-    }
-
-    seenContextNames.add(source.contextName);
-    appendSourceConfig(merged, source.config, source.contextName, source.filePath);
+    appendSourceConfig(merged, source.config, source.filePath, seenNames);
   }
+
+  delete merged["current-context"];
 
   return { config: merged, inputFiles };
 }
@@ -168,15 +174,21 @@ export async function splitKubeConfigFile(options: SplitOptions = {}): Promise<S
 
 export function splitKubeConfig(config: KubeConfig, sourceLabel = "kubeconfig"): SplitConfig[] {
   const contexts = getNamedContexts(config, sourceLabel);
+  const clusters = getNamedClusters(config, sourceLabel);
+  const users = getNamedUsers(config, sourceLabel);
+
+  validateAndTrackUniqueNamedEntries(clusters, "cluster", sourceLabel, new Set());
+  validateAndTrackUniqueNamedEntries(users, "user", sourceLabel, new Set());
+  validateAndTrackUniqueNamedEntries(contexts, "context", sourceLabel, new Set());
 
   return contexts.map((context) => {
     const contextName = getNonEmptyString(context.name, `${sourceLabel} context name`);
     const contextBody = getContextBody(context, sourceLabel);
     const clusterName = getNonEmptyString(contextBody.cluster, `${sourceLabel} context "${contextName}" cluster`);
     const userName = getOptionalString(contextBody.user, `${sourceLabel} context "${contextName}" user`);
-    const cluster = findNamedEntry(getNamedClusters(config, sourceLabel), clusterName, "cluster", sourceLabel);
+    const cluster = findNamedEntry(clusters, clusterName, "cluster", sourceLabel);
     const user = userName
-      ? findNamedEntry(getNamedUsers(config, sourceLabel), userName, "user", sourceLabel)
+      ? findNamedEntry(users, userName, "user", sourceLabel)
       : undefined;
     const splitContext = deepClone(contextBody);
 
@@ -242,8 +254,7 @@ function generatedKubeConfigHeader(inputDir: string): string {
     "# To add a kubepile config:",
     `# 1. Save a kubeconfig file in ${inputDir}.`,
     `#    Example: ${exampleConfigPath}`,
-    "# 2. The filename becomes the context name.",
-    "# 3. Rebuild this generated config with:",
+    "# 2. Rebuild this generated config with:",
     `#    kubepile compile --config-dir ${shellQuote(inputDir)}`,
     "",
     "",
@@ -297,80 +308,31 @@ async function listKubeConfigFiles(inputDir: string): Promise<string[]> {
   return files;
 }
 
-function contextNameFromFile(filePath: string): string {
-  const contextName = path.basename(filePath, path.extname(filePath));
-  return getNonEmptyString(contextName, `context name from ${filePath}`);
-}
-
 function appendSourceConfig(
   merged: KubeConfig,
   sourceConfig: KubeConfig,
-  contextName: string,
   sourceLabel: string,
+  seenNames: MergeNameSets,
 ): void {
-  const selectedContext = selectContext(sourceConfig, sourceLabel);
-  const selectedContextBody = getContextBody(selectedContext, sourceLabel);
-  const sourceClusterName = getNonEmptyString(
-    selectedContextBody.cluster,
-    `${sourceLabel} selected context cluster`,
-  );
-  const sourceUserName = getOptionalString(
-    selectedContextBody.user,
-    `${sourceLabel} selected context user`,
-  );
-  const sourceCluster = findNamedEntry(getNamedClusters(sourceConfig, sourceLabel), sourceClusterName, "cluster", sourceLabel);
-  const sourceUser = sourceUserName
-    ? findNamedEntry(getNamedUsers(sourceConfig, sourceLabel), sourceUserName, "user", sourceLabel)
-    : undefined;
-  const outputContext = deepClone(selectedContextBody);
+  rejectCurrentContext(sourceConfig, sourceLabel);
 
-  outputContext.cluster = contextName;
+  const sourceClusters = getNamedClusters(sourceConfig, sourceLabel);
+  const sourceUsers = getNamedUsers(sourceConfig, sourceLabel);
+  const sourceContexts = getNamedContexts(sourceConfig, sourceLabel);
 
-  if (sourceUser) {
-    outputContext.user = contextName;
-  } else {
-    delete outputContext.user;
-  }
+  validateAndTrackUniqueNamedEntries(sourceClusters, "cluster", sourceLabel, seenNames.clusters);
+  validateAndTrackUniqueNamedEntries(sourceUsers, "user", sourceLabel, seenNames.users);
+  validateAndTrackUniqueNamedEntries(sourceContexts, "context", sourceLabel, seenNames.contexts);
 
-  merged.clusters?.push({
-    name: contextName,
-    cluster: deepClone(sourceCluster.cluster),
-  });
-
-  if (sourceUser) {
-    merged.users?.push({
-      name: contextName,
-      user: deepClone(sourceUser.user),
-    });
-  }
-
-  merged.contexts?.push({
-    name: contextName,
-    context: outputContext,
-  });
+  merged.clusters?.push(...deepClone(sourceClusters));
+  merged.users?.push(...deepClone(sourceUsers));
+  merged.contexts?.push(...deepClone(sourceContexts));
 }
 
-function selectContext(config: KubeConfig, sourceLabel: string): NamedContext {
-  const contexts = getNamedContexts(config, sourceLabel);
-  const currentContext = config["current-context"];
-
-  if (typeof currentContext === "string" && currentContext.length > 0) {
-    const selected = contexts.find((context) => context.name === currentContext);
-
-    if (!selected) {
-      throw new Error(`${sourceLabel} current-context "${currentContext}" was not found`);
-    }
-
-    return selected;
+function rejectCurrentContext(config: KubeConfig, sourceLabel: string): void {
+  if (Object.hasOwn(config, "current-context")) {
+    throw new Error(`${sourceLabel} must not set current-context`);
   }
-
-  if (contexts.length === 1) {
-    return contexts[0];
-  }
-
-  throw new Error(
-    `${sourceLabel} has ${contexts.length} contexts and no current-context; each kubepile source file must select exactly one context`,
-  );
 }
 
 function getNamedClusters(config: KubeConfig, sourceLabel: string): NamedCluster[] {
@@ -395,6 +357,23 @@ function getArray(value: unknown, label: string): unknown[] {
   }
 
   return value;
+}
+
+function validateAndTrackUniqueNamedEntries(
+  entries: Array<{ name: unknown }>,
+  entryType: string,
+  sourceLabel: string,
+  seen: Set<string>,
+): void {
+  for (const entry of entries) {
+    const name = getNonEmptyString(entry.name, `${sourceLabel} ${entryType} name`);
+
+    if (seen.has(name)) {
+      throw new Error(`Duplicate ${entryType} name "${name}" found in ${sourceLabel}`);
+    }
+
+    seen.add(name);
+  }
 }
 
 function getContextBody(context: NamedContext, sourceLabel: string): KubeContext {
