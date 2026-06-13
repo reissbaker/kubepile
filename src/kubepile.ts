@@ -88,6 +88,13 @@ export async function buildMergedConfig(options: CompileOptions = {}): Promise<{
 }> {
   const inputDir = options.inputDir ?? defaultKubepileDir();
   const inputFiles = await listKubeConfigFiles(inputDir);
+  return buildMergedConfigFromFiles(inputFiles);
+}
+
+async function buildMergedConfigFromFiles(inputFiles: string[]): Promise<{
+  config: KubeConfig;
+  inputFiles: string[];
+}> {
   const configs = await Promise.all(
     inputFiles.map(async (filePath) => ({
       filePath,
@@ -126,7 +133,7 @@ export async function compileToKubeConfig(options: CompileToFileOptions = {}): P
   let backedUpTo: string | undefined;
 
   if (await pathExists(outputPath)) {
-    const shouldBackup = await options.shouldBackup?.(outputPath, backupPath);
+    const shouldBackup = await shouldBackUpExistingKubeConfig(outputPath, inputDir, inputFiles, options);
 
     if (shouldBackup) {
       await mkdir(path.dirname(backupPath), { recursive: true });
@@ -139,6 +146,82 @@ export async function compileToKubeConfig(options: CompileToFileOptions = {}): P
   await writeFile(outputPath, serializeGeneratedKubeConfig(config, inputDir), "utf8");
 
   return { config, inputFiles, outputPath, backedUpTo };
+}
+
+async function shouldBackUpExistingKubeConfig(
+  outputPath: string,
+  inputDir: string,
+  currentInputFiles: string[],
+  options: CompileToFileOptions,
+): Promise<boolean> {
+  if (await canSafelyRegenerate(outputPath, inputDir, currentInputFiles)) {
+    return false;
+  }
+
+  return Boolean(await options.shouldBackup?.(outputPath, `${outputPath}.bak`));
+}
+
+async function canSafelyRegenerate(
+  outputPath: string,
+  inputDir: string,
+  currentInputFiles: string[],
+): Promise<boolean> {
+  const existingSource = await readFile(outputPath, "utf8");
+
+  if (!existingSource.startsWith(generatedKubeConfigHeader(inputDir))) {
+    return false;
+  }
+
+  try {
+    const existingConfig = parseKubeConfig(existingSource, outputPath);
+    const previousInputFiles = await findInputFilesRepresentedInConfig(currentInputFiles, existingConfig);
+
+    if (previousInputFiles.length === 0) {
+      return false;
+    }
+
+    const { config } = await buildMergedConfigFromFiles(previousInputFiles);
+    return existingSource === serializeGeneratedKubeConfig(config, inputDir);
+  } catch {
+    return false;
+  }
+}
+
+async function findInputFilesRepresentedInConfig(
+  inputFiles: string[],
+  config: KubeConfig,
+): Promise<string[]> {
+  const representedInputFiles: string[] = [];
+
+  for (const inputFile of inputFiles) {
+    const inputConfig = await readKubeConfigFile(inputFile);
+
+    if (configContainsAllNamedEntries(config, inputConfig, inputFile)) {
+      representedInputFiles.push(inputFile);
+    }
+  }
+
+  return representedInputFiles;
+}
+
+function configContainsAllNamedEntries(
+  haystack: KubeConfig,
+  needle: KubeConfig,
+  sourceLabel: string,
+): boolean {
+  return hasAllNamedEntries(getNamedClusters(haystack, sourceLabel), getNamedClusters(needle, sourceLabel))
+    && hasAllNamedEntries(getNamedUsers(haystack, sourceLabel), getNamedUsers(needle, sourceLabel))
+    && hasAllNamedEntries(getNamedContexts(haystack, sourceLabel), getNamedContexts(needle, sourceLabel));
+}
+
+function hasAllNamedEntries<T extends { name: string }>(haystack: T[], needles: T[]): boolean {
+  const entriesByName = new Map(haystack.map((entry) => [entry.name, entry]));
+
+  return needles.every((needle) => deepEqual(entriesByName.get(needle.name), needle));
+}
+
+function deepEqual(left: unknown, right: unknown): boolean {
+  return JSON.stringify(left) === JSON.stringify(right);
 }
 
 async function pathExists(filePath: string): Promise<boolean> {
@@ -231,7 +314,10 @@ export function serializeKubeConfig(config: KubeConfig): string {
   return stringify(config, { lineWidth: 0 });
 }
 
-export function serializeGeneratedKubeConfig(config: KubeConfig, inputDir = defaultKubepileDir()): string {
+export function serializeGeneratedKubeConfig(
+  config: KubeConfig,
+  inputDir = defaultKubepileDir(),
+): string {
   return `${generatedKubeConfigHeader(inputDir)}${serializeKubeConfig(config)}`;
 }
 

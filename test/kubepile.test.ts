@@ -370,6 +370,80 @@ contexts:
     expect(output.contexts?.[0]?.name).toBe("dev-source");
   });
 
+  it("does not ask for a backup on a no-op safe regeneration", async () => {
+    const dir = await tempDir();
+    const outputPath = path.join(dir, ".kube", "config");
+    await writeFile(path.join(dir, "dev.yaml"), kubeConfigSource("dev"), "utf8");
+
+    await compileToKubeConfig({
+      inputDir: dir,
+      outputPath,
+      shouldBackup: () => {
+        throw new Error("unexpected backup prompt");
+      },
+    });
+
+    const result = await compileToKubeConfig({
+      inputDir: dir,
+      outputPath,
+      shouldBackup: () => {
+        throw new Error("unexpected backup prompt");
+      },
+    });
+
+    expect(result.backedUpTo).toBeUndefined();
+  });
+
+  it("does not ask for a backup when adding a new source file to a safely generated config", async () => {
+    const dir = await tempDir();
+    const outputPath = path.join(dir, ".kube", "config");
+    await writeFile(path.join(dir, "dev.yaml"), kubeConfigSource("dev"), "utf8");
+
+    await compileToKubeConfig({
+      inputDir: dir,
+      outputPath,
+      shouldBackup: () => {
+        throw new Error("unexpected backup prompt");
+      },
+    });
+
+    await writeFile(path.join(dir, "prod.yaml"), kubeConfigSource("prod"), "utf8");
+
+    const result = await compileToKubeConfig({
+      inputDir: dir,
+      outputPath,
+      shouldBackup: () => {
+        throw new Error("unexpected backup prompt");
+      },
+    });
+    const output = parseKubeConfig(await readFile(outputPath, "utf8"), outputPath);
+
+    expect(result.backedUpTo).toBeUndefined();
+    expect(output.contexts?.map((context) => context.name)).toEqual(["dev-context", "prod-context"]);
+  });
+
+  it("asks for a backup when the existing generated config was edited", async () => {
+    const dir = await tempDir();
+    const outputPath = path.join(dir, ".kube", "config");
+    await writeFile(path.join(dir, "dev.yaml"), kubeConfigSource("dev"), "utf8");
+
+    await compileToKubeConfig({
+      inputDir: dir,
+      outputPath,
+      shouldBackup: () => false,
+    });
+    await writeFile(outputPath, `${await readFile(outputPath, "utf8")}# manual edit\n`, "utf8");
+
+    const result = await compileToKubeConfig({
+      inputDir: dir,
+      outputPath,
+      shouldBackup: () => true,
+    });
+
+    expect(result.backedUpTo).toBe(`${outputPath}.bak`);
+    await expect(readFile(`${outputPath}.bak`, "utf8")).resolves.toContain("# manual edit");
+  });
+
   it("omits --config-dir from the generated rebuild command for the default config dir", () => {
     const output = serializeGeneratedKubeConfig(
       {
@@ -502,4 +576,23 @@ async function tempDir(): Promise<string> {
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function kubeConfigSource(name: string): string {
+  return `apiVersion: v1
+kind: Config
+clusters:
+  - name: ${name}-cluster
+    cluster:
+      server: https://${name}.example.test
+users:
+  - name: ${name}-user
+    user:
+      token: ${name}-token
+contexts:
+  - name: ${name}-context
+    context:
+      cluster: ${name}-cluster
+      user: ${name}-user
+`;
 }
