@@ -1,4 +1,4 @@
-# kubepile
+# Kubepile
 
 Have you ever tried to maintain a Kubernetes config for multiple clusters? It's
 gross! It's hard to visually track which users, clusters, and contexts relate
