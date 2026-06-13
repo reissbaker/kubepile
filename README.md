@@ -126,7 +126,7 @@ shell.
 
 Do you already have a giant unmaintainable mess of a kubeconfig? No worries!
 Kubepile ships a `split` command that auto-splits your existing kubeconfig into
-separate per-context kubepile config files, and tells you on the command line
+separate per-context Kubepile config files, and tells you on the command line
 if you have unsplittable configs due to impossible settings from config drift —
 and which keys exactly are the problem, so you can clean up your config before
 splitting it.
