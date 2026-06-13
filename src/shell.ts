@@ -3,7 +3,6 @@ import os from "node:os";
 import path from "node:path";
 import {
   defaultKubeConfigPath,
-  extractContextConfig,
   readKubeConfigFile,
   serializeKubeConfig,
 } from "./kubepile.ts";
@@ -44,9 +43,16 @@ export async function generateShellCommand(
   const sourcePath = options.sourcePath ?? defaultKubeConfigPath();
   const shell = options.shell ?? "posix";
   const sourceConfig = await readKubeConfigFile(sourcePath);
-  const contextConfig = extractContextConfig(sourceConfig, contextName, sourcePath);
+  const contextConfig = {
+    ...sourceConfig,
+    "current-context": contextName,
+  };
   const tempRoot = await mkdtemp(path.join(options.tempDir ?? os.tmpdir(), "kubepile-source-"));
   const kubeConfigPath = path.join(tempRoot, "config");
+
+  if (!sourceConfig.contexts?.some((context) => context.name === contextName)) {
+    throw new Error(`${sourcePath} does not contain context "${contextName}"`);
+  }
 
   await writeFile(kubeConfigPath, serializeKubeConfig(contextConfig), {
     encoding: "utf8",

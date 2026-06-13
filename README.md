@@ -36,6 +36,15 @@ Kubepile will never set a `current-context`, out of the design belief that
 npm install -g kubepile
 ```
 
+Kubepile also includes a small shell helper that you need to install once:
+
+```sh
+kubepile install
+```
+
+Once you've installed the shell helper, either start a new shell or re-source
+your `.zshrc`/`.bashrc`/`.profile`/etc. Kubepile supports Zsh, Bash, and Fish.
+
 ## Compile
 
 ```sh
@@ -65,28 +74,35 @@ Running `kubepile` with no command prints help.
 
 ## Source
 
-`kubepile source <context>` switches your current shell to one context by
-creating a temporary kubeconfig containing only that context and exporting
-`KUBECONFIG` to point at it. It also prefixes your shell prompt with the context
-name.
+`kubepile source <context>` switches your current shell to use a specific
+Kubernetes context by default by creating a temporary kubeconfig with that
+context set as the current-context, and exporting `KUBECONFIG` to point at it.
+It also prefixes your shell prompt with the context name.
 
-Shells do not let child processes modify the parent shell environment, so this
-requires installing a small shell function first:
+```sh
+kubepile source prod
+# Your shell prompt is now:
+# (prod) WHATEVER_YOUR_OLD_PROMPT_WAS
+# All kubectl commands will use the prod context
+```
+
+To switch to a different context, just run the `source` command with a new
+context:
+
+```sh
+kubepile source dev
+```
+
+Note that this requires installing the shell helpers listed in the
+installation instructions. If you haven't installed them yet, install them
+with:
 
 ```sh
 kubepile install
 ```
 
-Then start a new shell and run:
-
-```sh
-kubepile source prod
-```
-
-`kubepile install` installs only for your current shell. It supports bash, zsh,
-and fish. The installed function proxies every normal command to the real
-`kubepile` binary with `command kubepile`, so it follows whatever `kubepile` is
-currently on your `PATH` after tools like `nvm` update it.
+And re-source your main shell config (such as e.g. a `.zshrc`) or start a new
+shell.
 
 ## Split
 

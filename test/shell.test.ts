@@ -20,7 +20,7 @@ afterEach(async () => {
 });
 
 describe("generateShellCommand", () => {
-  it("writes a temporary kubeconfig for one context and emits posix shell code", async () => {
+  it("writes a full temporary kubeconfig with the requested current context and emits posix shell code", async () => {
     const dir = await mkTempDir();
     const sourcePath = path.join(dir, "config");
     await writeSourceKubeConfig(sourcePath);
@@ -35,9 +35,9 @@ describe("generateShellCommand", () => {
 
     expect(tempStat.mode & 0o777).toBe(0o600);
     expect(tempConfig["current-context"]).toBe("prod");
-    expect(tempConfig.contexts?.map((context) => context.name)).toEqual(["prod"]);
-    expect(tempConfig.clusters?.map((cluster) => cluster.name)).toEqual(["prod-cluster"]);
-    expect(tempConfig.users?.map((user) => user.name)).toEqual(["prod-user"]);
+    expect(tempConfig.contexts?.map((context) => context.name)).toEqual(["dev", "prod"]);
+    expect(tempConfig.clusters?.map((cluster) => cluster.name)).toEqual(["dev-cluster", "prod-cluster"]);
+    expect(tempConfig.users?.map((user) => user.name)).toEqual(["dev-user", "prod-user"]);
     expect(result.shellCommand).toContain(`export KUBECONFIG=${result.kubeConfigPath}`);
     expect(result.shellCommand).toContain("export PS1='(prod) '\"$KUBEPILE_OLD_PS1\"");
   });
