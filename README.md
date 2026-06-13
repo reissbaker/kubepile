@@ -53,8 +53,8 @@ intentionally fail compilation with a helpful message explaining which file
 broke the Kubepile rules, so that you can fix it.
 
 Kubepile will never set a `current-context`, out of the design belief that
-setting a global, cross-shell-session `current-context` is a dangerous footgun
-in multi-cluster setups. Instead, use `kubepile source <context>` to
+setting a global, mutable, cross-shell-session `current-context` is a dangerous
+footgun in multi-cluster setups. Instead, use `kubepile source <context>` to
 temporarily set a default context for your current shell session.
 
 ## Compile
