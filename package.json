@@ -1,0 +1,48 @@
+{
+  "name": "kubepile",
+  "version": "0.1.0",
+  "description": "Compile and split kubeconfig files from ~/.config/kubepile.",
+  "type": "module",
+  "main": "./dist/src/kubepile.js",
+  "types": "./dist/src/kubepile.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/src/kubepile.d.ts",
+      "import": "./dist/src/kubepile.js"
+    }
+  },
+  "bin": {
+    "kubepile": "./dist/src/cli.js"
+  },
+  "files": [
+    "dist/package.json",
+    "dist/src",
+    "README.md"
+  ],
+  "scripts": {
+    "clean": "rm -rf dist",
+    "build": "npm run clean && tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --dir test",
+    "prepublishOnly": "npm run typecheck && npm run build && npm test"
+  },
+  "keywords": [
+    "kubernetes",
+    "kubeconfig",
+    "kubectl"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "dependencies": {
+    "@commander-js/extra-typings": "^15.0.0",
+    "commander": "^15.0.0",
+    "yaml": "^2.9.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.3",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.8"
+  }
+}
