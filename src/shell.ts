@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import {
   defaultKubeConfigPath,
+  type KubeConfig,
   readKubeConfigFile,
   serializeKubeConfig,
 } from "./kubepile.ts";
@@ -19,6 +20,10 @@ export interface GenerateShellCommandOptions {
 export interface GenerateShellCommandResult {
   kubeConfigPath: string;
   shellCommand: string;
+}
+
+export interface ListSourceContextNamesOptions {
+  sourcePath?: string;
 }
 
 export interface InstallShellIntegrationOptions {
@@ -50,7 +55,7 @@ export async function generateShellCommand(
   const tempRoot = await mkdtemp(path.join(options.tempDir ?? os.tmpdir(), "kubepile-source-"));
   const kubeConfigPath = path.join(tempRoot, "config");
 
-  if (!sourceConfig.contexts?.some((context) => context.name === contextName)) {
+  if (!contextNamesFromConfig(sourceConfig, sourcePath).includes(contextName)) {
     throw new Error(`${sourcePath} does not contain context "${contextName}"`);
   }
 
@@ -65,6 +70,13 @@ export async function generateShellCommand(
       ? fishSourceCommand(contextName, kubeConfigPath)
       : posixSourceCommand(contextName, kubeConfigPath),
   };
+}
+
+export async function listSourceContextNames(
+  options: ListSourceContextNamesOptions = {},
+): Promise<string[]> {
+  const sourcePath = options.sourcePath ?? defaultKubeConfigPath();
+  return contextNamesFromConfig(await readKubeConfigFile(sourcePath), sourcePath);
 }
 
 export async function installShellIntegration(
@@ -142,6 +154,12 @@ function posixIntegrationFunction(shell: Exclude<ShellKind, "fish">): string {
   return `kubepile() {
   if [ "$1" = "source" ]; then
     shift
+    for arg in "$@"; do
+      if [ "$arg" = "--list" ]; then
+        command \\kubepile source "$@"
+        return
+      fi
+    done
     eval "$(command \\kubepile generate-shell-command --shell ${shell} "$@")"
   else
     command \\kubepile "$@"
@@ -153,7 +171,11 @@ function fishIntegrationFunction(): string {
   return `function kubepile
   if test (count $argv) -gt 0; and test "$argv[1]" = "source"
     set -e argv[1]
-    command kubepile generate-shell-command --shell fish $argv | source
+    if contains -- --list $argv
+      command kubepile source $argv
+    else
+      command kubepile generate-shell-command --shell fish $argv | source
+    end
   else
     command kubepile $argv
   end
@@ -220,6 +242,24 @@ async function firstExistingPath(filePaths: string[]): Promise<string | undefine
   }
 
   return undefined;
+}
+
+function contextNamesFromConfig(config: KubeConfig, sourcePath: string): string[] {
+  if (config.contexts === undefined) {
+    return [];
+  }
+
+  if (!Array.isArray(config.contexts)) {
+    throw new Error(`${sourcePath} contexts must be an array`);
+  }
+
+  return config.contexts.map((context) => {
+    if (typeof context.name !== "string" || context.name.length === 0) {
+      throw new Error(`${sourcePath} context name must be a non-empty string`);
+    }
+
+    return context.name;
+  });
 }
 
 function escapeRegExp(value: string): string {

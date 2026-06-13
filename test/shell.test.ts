@@ -7,6 +7,7 @@ import {
   detectCurrentShell,
   generateShellCommand,
   installShellIntegration,
+  listSourceContextNames,
   shellIntegrationBlock,
   shellRcFile,
   upsertShellIntegrationBlock,
@@ -59,6 +60,16 @@ describe("generateShellCommand", () => {
   });
 });
 
+describe("listSourceContextNames", () => {
+  it("lists context names from the source kubeconfig", async () => {
+    const dir = await mkTempDir();
+    const sourcePath = path.join(dir, "config");
+    await writeSourceKubeConfig(sourcePath);
+
+    await expect(listSourceContextNames({ sourcePath })).resolves.toEqual(["dev", "prod"]);
+  });
+});
+
 describe("shell integration", () => {
   it("detects supported shells", () => {
     expect(detectCurrentShell("/bin/bash")).toBe("bash");
@@ -84,8 +95,17 @@ describe("shell integration", () => {
   it("uses command kubepile in the installed posix wrapper", () => {
     const block = shellIntegrationBlock("zsh");
 
+    expect(block).toContain('command \\kubepile source "$@"');
     expect(block).toContain('eval "$(command \\kubepile generate-shell-command --shell zsh "$@")"');
     expect(block).toContain('command \\kubepile "$@"');
+  });
+
+  it("passes source --list through in the installed fish wrapper", () => {
+    const block = shellIntegrationBlock("fish");
+
+    expect(block).toContain("if contains -- --list $argv");
+    expect(block).toContain("command kubepile source $argv");
+    expect(block).toContain("command kubepile generate-shell-command --shell fish $argv | source");
   });
 
   it("upserts the managed block", () => {

@@ -13,22 +13,11 @@ Kubepile lets you maintain individual, per-provider kubeconfigs in a
 `~/.config/kubepile` directory, and compile them into a single, merged
 kubeconfig.
 
-Each `*.yaml` file is a normal kubeconfig. You can paste in kubeconfigs from
-providers without converting them to a kubepile-specific schema. During
-`compile`, kubepile reads every file and merges its `clusters`, `users`, and
-`contexts` directly into the generated kubeconfig.
+Kubepile exposes a tiny set of commands to manage your configs:
 
-Kubepile automatically ensures the following:
-
-- No kubepile files set a `current-context`.
-- No cluster, user, or context names clash.
-
-If a new file is added that clashes or sets a `current-context`, kubepile will
-intentionally fail compilation with a helpful message explaining which file
-broke the kubepile rules.
-
-Kubepile will never set a `current-context`, out of the design belief that
-`current-context` is a dangerous footgun in multi-cluster setups.
+* `compile`: compile your Kubepile configs into a merged kubeconfig
+* `source`: set a specific context as your default for the current shell
+* `split`: decompile an existing, messy kubeconfig into nice Kubepile configs
 
 ## Install
 
@@ -44,6 +33,27 @@ kubepile install
 
 Once you've installed the shell helper, either start a new shell or re-source
 your `.zshrc`/`.bashrc`/`.profile`/etc. Kubepile supports Zsh, Bash, and Fish.
+
+## Kubepile configs
+
+Each `*.yaml` file is a normal kubeconfig. You can paste in kubeconfigs from
+providers without converting them to a kubepile-specific schema. During
+`compile`, kubepile reads every file and merges its `clusters`, `users`, and
+`contexts` directly into the generated kubeconfig.
+
+Kubepile automatically ensures the following:
+
+- No kubepile files set a `current-context`.
+- No cluster, user, or context names clash.
+
+If a new file is added that clashes or sets a `current-context`, kubepile will
+intentionally fail compilation with a helpful message explaining which file
+broke the kubepile rules.
+
+Kubepile will never set a `current-context`, out of the design belief that
+setting a global, cross-shell-session `current-context` is a dangerous footgun
+in multi-cluster setups. Instead, use `kubepile source <context>` to
+temporarily set a default context for your current shell session.
 
 ## Compile
 
@@ -84,6 +94,12 @@ kubepile source prod
 # Your shell prompt is now:
 # (prod) WHATEVER_YOUR_OLD_PROMPT_WAS
 # All kubectl commands will use the prod context
+```
+
+To list available contexts:
+
+```sh
+kubepile source --list
 ```
 
 To switch to a different context, just run the `source` command with a new

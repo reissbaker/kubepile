@@ -12,6 +12,7 @@ import {
 import {
   generateShellCommand,
   installShellIntegration,
+  listSourceContextNames,
 } from "./shell.ts";
 
 const program = createProgram();
@@ -126,8 +127,21 @@ Defaults:
   program
     .command("source")
     .description("Switch to one kube context in the current shell.")
-    .argument("<context>", "context name to source")
-    .action(() => {
+    .argument("[context]", "context name to source")
+    .option("--list", "list available contexts")
+    .action(async (context, options) => {
+      if (options.list) {
+        const contextNames = await listSourceContextNames();
+        if (contextNames.length > 0) {
+          process.stdout.write(`${contextNames.join("\n")}\n`);
+        }
+        return;
+      }
+
+      if (!context) {
+        throw new Error("kubepile source requires a context name or --list.");
+      }
+
       throw new Error(
         "kubepile source requires shell integration. Run `kubepile install`, start a new shell, then run `kubepile source <context>`.",
       );
