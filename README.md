@@ -5,6 +5,9 @@ gross! It's hard to visually track which users, clusters, and contexts relate
 to each other, and as you add and remove clusters your config inevitably bloats
 into a mess and becomes hard to reason about.
 
+![messy
+boxes](https://raw.githubusercontent.com/reissbaker/kubepile/refs/heads/main/boxes.png)
+
 Kubepile lets you maintain individual, per-cluster kubeconfigs in a
 `~/.config/kubepile` directory, and compile them into a single, merged
 kubeconfig, where each context is named after the filename.
