@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 import process from "node:process";
 import { createInterface } from "node:readline/promises";
-import { pathToFileURL } from "node:url";
 import { Command } from "@commander-js/extra-typings";
 import packageJson from "../package.json" with { type: "json" };
 import {
@@ -11,15 +10,16 @@ import {
   splitKubeConfigFile,
 } from "./kubepile.ts";
 
-export async function runCli(argv: string[]): Promise<void> {
-  const program = createProgram();
+const program = createProgram();
 
-  if (argv.length === 0) {
-    program.outputHelp();
-    return;
-  }
-
-  await program.parseAsync(argv, { from: "user" });
+if (process.argv.slice(2).length === 0) {
+  program.outputHelp();
+} else {
+  program.parseAsync(process.argv.slice(2), { from: "user" }).catch((error: unknown) => {
+    const message = error instanceof Error ? error.message : String(error);
+    process.stderr.write(`kubepile: ${message}\n`);
+    process.exitCode = 1;
+  });
 }
 
 async function askBackup(existingPath: string, backupPath: string): Promise<boolean> {
@@ -94,14 +94,4 @@ Defaults:
     });
 
   return program;
-}
-
-const entryPoint = process.argv[1] ? pathToFileURL(process.argv[1]).href : undefined;
-
-if (import.meta.url === entryPoint) {
-  runCli(process.argv.slice(2)).catch((error: unknown) => {
-    const message = error instanceof Error ? error.message : String(error);
-    process.stderr.write(`kubepile: ${message}\n`);
-    process.exitCode = 1;
-  });
 }

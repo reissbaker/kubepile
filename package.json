@@ -22,7 +22,7 @@
   ],
   "scripts": {
     "clean": "rm -rf dist",
-    "build": "npm run clean && tsc",
+    "build": "npm run clean && tsc && chmod +x dist/src/cli.js",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --dir test",
     "prepublishOnly": "npm run typecheck && npm run build && npm test"

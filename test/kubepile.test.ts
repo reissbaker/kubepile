@@ -1,8 +1,7 @@
 import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, describe, expect, it, vi } from "vitest";
-import { runCli } from "../src/cli.ts";
+import { afterEach, describe, expect, it } from "vitest";
 import {
   buildMergedConfig,
   compileToKubeConfig,
@@ -504,18 +503,3 @@ async function tempDir(): Promise<string> {
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
-
-describe("runCli", () => {
-  it("prints help instead of compiling when no command is provided", async () => {
-    const write = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
-
-    try {
-      await runCli([]);
-      const output = write.mock.calls.map((call) => String(call[0])).join("");
-      expect(output).toContain("Usage: kubepile");
-      expect(output).toContain("compile [options]");
-    } finally {
-      write.mockRestore();
-    }
-  });
-});
