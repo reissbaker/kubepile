@@ -50,7 +50,7 @@ Kubepile automatically ensures the following:
 
 If a new file is added that clashes or sets a `current-context`, Kubepile will
 intentionally fail compilation with a helpful message explaining which file
-broke the Kubepile rules.
+broke the Kubepile rules, so that you can fix it.
 
 Kubepile will never set a `current-context`, out of the design belief that
 setting a global, cross-shell-session `current-context` is a dangerous footgun
