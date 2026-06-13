@@ -1,6 +1,6 @@
 {
   "name": "kubepile",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "description": "Compile and split kubeconfig files from ~/.config/kubepile.",
   "type": "module",
   "main": "./dist/src/kubepile.js",
