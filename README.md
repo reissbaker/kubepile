@@ -16,8 +16,7 @@ kubeconfig.
 Each `*.yaml` file is a normal kubeconfig. You can paste in kubeconfigs from
 providers without converting them to a kubepile-specific schema. During
 `compile`, kubepile reads every file and merges its `clusters`, `users`, and
-`contexts` directly into the generated kubeconfig. It does not rename anything
-based on the filename.
+`contexts` directly into the generated kubeconfig.
 
 Kubepile automatically ensures the following:
 
